@@ -1,3 +1,5 @@
-# The language bar: this repo holds only docs and downloads, while the app itself is built in
-# Rust (Tauri). The notices file lists the Rust crates the app is built from.
-THIRD_PARTY_NOTICES.md linguist-language=Rust linguist-detectable=true
+# Show the app's languages on GitHub (this repo holds docs and downloads; the app itself is
+# Rust with a React + TypeScript interface, built with Tauri).
+README.md linguist-detectable=true linguist-documentation=false linguist-language=Rust
+PRIVACY.md linguist-detectable=true linguist-documentation=false linguist-language=TypeScript
+CHANGELOG.md linguist-detectable=true linguist-documentation=false linguist-language=TypeScript
