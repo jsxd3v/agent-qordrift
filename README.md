@@ -1,6 +1,6 @@
 # agent-qordrift
 
-**One dashboard for all your project agents.** Each agent runs the work for one folder — commands, dev servers,
+**A desktop app for all your project agents.** Each agent runs the work for one folder — commands, dev servers,
 database checks and AI tasks — and shows live progress, logs and a clear **Success** or **Failed at step N**.
 Run one agent or all of them, one after another or in parallel. Free for macOS and Windows.
 
@@ -10,7 +10,7 @@ Run one agent or all of them, one after another or in parallel. Free for macOS a
 
 ## What is an agent?
 
-An **agent** is a card on the dashboard: a folder plus the things to do in it, in order. You build an agent from
+An **agent** is a card in the app: a folder plus the things to do in it, in order. You build an agent from
 four kinds of building blocks and mix them freely:
 
 | Building block | What it does | Typical use |
@@ -22,7 +22,7 @@ four kinds of building blocks and mix them freely:
 
 Steps run top to bottom and stop at the first failure. Services start first, so your steps can test a running app.
 
-## Many agents, one dashboard
+## Many agents, one app
 
 Most people have more than one project, and more than one thing to check per project. agent-qordrift is built for
 that:
