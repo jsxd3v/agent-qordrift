@@ -2,7 +2,7 @@
 
 All notable changes to agent-qordrift. Versions follow [Semantic Versioning](https://semver.org/).
 
-## [1.0.0] — unreleased
+## [1.0.0] — 2026-11-14
 
 First public release.
 
