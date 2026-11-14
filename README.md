@@ -1,8 +1,9 @@
 # agent-qordrift
 
-**A desktop app for all your project agents.** Each agent runs the work for one folder — commands, dev servers,
-database checks and AI tasks — and shows live progress, logs and a clear **Success** or **Failed at step N**.
-Run one agent or all of them, one after another or in parallel. Free for macOS and Windows.
+**A desktop app for multi-agent flows on your projects.** Each agent runs the work for one folder — commands,
+dev servers, database checks and AI tasks — and agent-qordrift runs your agents together as one flow: one after
+another or in parallel, with live progress, logs and a clear **Success** or **Failed at step N** for every agent.
+Free for macOS and Windows.
 
 ![agent-qordrift demo: agent cards running, a failed step and its log, then another project passing](screenshots/demo.gif)
 
@@ -22,21 +23,53 @@ four kinds of building blocks and mix them freely:
 
 Steps run top to bottom and stop at the first failure. Services start first, so your steps can test a running app.
 
-## Many agents, one app
+## Multi-agent flows
 
-Most people have more than one project, and more than one thing to check per project. agent-qordrift is built for
-that:
+One agent checks one thing. A **flow** runs many agents together: your local checks, a staging smoke test, the
+mobile app and a nightly data check, across all your projects, with one click on **Run all** or on a schedule.
 
-- **Projects group agents.** For example, *Acme Shop* with a **Local checks**, a **Staging smoke** and a
-  **Mobile app** agent, each with its own folder. Give a project a logo and its agents carry it.
-- **Run one, or Run all.** Run all goes through every agent one after another (or in parallel, with a limit you set),
-  skipping agents that are already running.
-- **Schedules.** Run an agent once at a set time, every few minutes, hours or days, or on chosen weekdays.
-- **Find things fast.** Search, filter by status (Running, Failed, Passed) or project, and tag agents.
-- **Live and hands-off.** Live colored logs per step and service, Pause, Resume, Stop (which ends the whole process
-  tree), desktop notifications, a tray icon with the overall status, and a history of each agent's last runs with
-  the git branch and commit.
+```mermaid
+flowchart LR
+    R([Run all]) --> A1["Acme Shop · Local checks"]
+    A1 --> A2["Acme Shop · Staging smoke"]
+    A2 --> A3["Clinic Portal · Full checks"]
+    A3 --> A4["Billing API · CI"]
+    A4 --> D([Every agent shows Success or Failed at step N])
+```
+
+- **In order, like a pipeline.** Run all goes through your agents in the order of the cards (drag a card to move
+  it). Turn on **Stop on first failure** to skip the rest of the flow once an agent fails.
+- **Or in parallel.** Run several agents at the same time, up to the limit you set (**Settings → Run all**). One
+  after another is the default, because test suites often compete for ports and CPU.
+- **Safe to run again.** Agents that are already running are skipped, and agents that only start servers are left
+  for you to start.
+- **On a schedule.** Start an agent once at a set time, every few minutes, hours or days, or on chosen weekdays.
+- **Grouped by project.** For example, *Acme Shop* with **Local checks**, **Staging smoke** and **Mobile app**
+  agents, each with its own folder. Give a project a logo and its agents carry it.
+- **Watched in one place.** Live colored logs for every step and service, Pause, Resume and Stop (which ends the
+  whole process tree), desktop notifications, a tray icon with the overall status, search and filters (Running,
+  Failed, Passed, project, tags), and a history of each agent's runs with the git branch and commit.
 - **Bookmarks.** Keep each project's links (staging site, dashboard, docs) one click away.
+
+### The flow inside one agent
+
+Every agent is itself a small flow: its services start first, then its steps run in order, so a later step can
+check what an earlier one did (for example, tests after an AI task).
+
+```mermaid
+flowchart LR
+    S["Start services<br/>wait until ready"] --> C["Commands"]
+    C --> Q["Queries"]
+    Q --> T["AI tasks"]
+    T --> E["Stop services<br/>(or keep them up until Stop)"]
+    E --> OK([Success])
+    C -. fails .-> F([Failed at step N])
+    Q -. fails .-> F
+    T -. fails .-> F
+    F -. with an AI key .-> X["AI analysis · Fix with AI<br/>runs the agent again"]
+```
+
+Steps can be any mix and order of commands, queries and AI tasks; the diagram shows one example.
 
 ## Building blocks in detail
 
@@ -107,7 +140,11 @@ steps:
     run: npm test             # check the AI's work with a normal command
 ```
 
-AI tasks need **Agent mode** (Settings → AI) and your own Claude or OpenAI API key. The AI can read and change files
+AI tasks need **Agent mode** (Settings → AI) and your own Claude or OpenAI API key. The model you choose works as an
+agent with three tools: it can **read** and **search** files and **propose a change**; agent-qordrift applies the
+change, never the model itself. Agent mode recommends a strong model (such as Claude Opus or GPT-6.1) and warns you if
+the chosen one is too small for agent work. **Fix with AI** works the same way, starting from a failed run instead of
+a prompt, and can start by itself after a failure (**Start automatically**). The AI can read and change files
 only inside the agent's folder, never `.env` files, keys, `.git` or `node_modules`. The earlier version of every
 file it changes is kept on your computer for 90 days.
 
