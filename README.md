@@ -1,14 +1,165 @@
 # agent-qordrift
 
-**Run each project's checks — lint, typecheck, unit tests, E2E, builds — from one dashboard of cards.**
-Click **Run**, watch live logs, and get a clear **Success** or **Failed at step N**. Free for macOS and Windows.
+**One dashboard for all your project agents.** Each agent runs the work for one folder — commands, dev servers,
+database checks and AI tasks — and shows live progress, logs and a clear **Success** or **Failed at step N**.
+Run one agent or all of them, one after another or in parallel. Free for macOS and Windows.
 
-Optional: add your own Claude or OpenAI API key and agent-qordrift explains failures for you — what failed, where,
-and how to fix it.
-
-![agent-qordrift demo: Home tiles, Run all, a failed step and its log](screenshots/demo.gif)
+![agent-qordrift demo: agent cards running, a failed step and its log, then another project passing](screenshots/demo.gif)
 
 <sub>[Watch the demo as a video](screenshots/demo.mp4) · the projects in the demo are sample data.</sub>
+
+## What is an agent?
+
+An **agent** is a card on the dashboard: a folder plus the things to do in it, in order. You build an agent from
+four kinds of building blocks and mix them freely:
+
+| Building block | What it does | Typical use |
+|---|---|---|
+| ⚙️ **Command** | Runs a shell command in the agent's folder | lint, typecheck, unit tests, E2E, builds, deploy scripts |
+| 🖥️ **Service** | Starts a long-running process, waits until it is ready, stops it afterwards | dev server, API, `docker compose up`, emulators |
+| 🗄️ **Query** | Runs SQL against Postgres or Supabase and checks the result | "no orders stuck in pending", data health checks, reports |
+| ✨ **AI task** | Lets the AI do what your prompt asks in the agent's folder (optional, your own key) | small code changes, scaffolding, fixing a failing test |
+
+Steps run top to bottom and stop at the first failure. Services start first, so your steps can test a running app.
+
+## Many agents, one dashboard
+
+Most people have more than one project, and more than one thing to check per project. agent-qordrift is built for
+that:
+
+- **Projects group agents.** For example, *Acme Shop* with a **Local checks**, a **Staging smoke** and a
+  **Mobile app** agent, each with its own folder. Give a project a logo and its agents carry it.
+- **Run one, or Run all.** Run all goes through every agent one after another (or in parallel, with a limit you set),
+  skipping agents that are already running.
+- **Schedules.** Run an agent once at a set time, every few minutes, hours or days, or on chosen weekdays.
+- **Find things fast.** Search, filter by status (Running, Failed, Passed) or project, and tag agents.
+- **Live and hands-off.** Live colored logs per step and service, Pause, Resume, Stop (which ends the whole process
+  tree), desktop notifications, a tray icon with the overall status, and a history of each agent's last runs with
+  the git branch and commit.
+- **Bookmarks.** Keep each project's links (staging site, dashboard, docs) one click away.
+
+## Building blocks in detail
+
+You set agents up in the editor (**Add agent**). The editor also has a YAML view; the examples below are what
+each building block looks like there.
+
+### ⚙️ Commands
+
+```yaml
+steps:
+  - name: Lint
+    run: npm run lint
+  - name: Unit tests
+    run: npm test
+  - name: E2E
+    dir: web              # a subfolder of the agent's folder
+    run: npm run e2e
+    timeout: 45m          # default 30m
+  - name: Coverage report
+    run: npm run coverage
+    continue_on_error: true   # a failure here doesn't stop the run
+```
+
+Commands run with your normal shell environment (nvm, pyenv, Homebrew, Go…), even when agent-qordrift is opened from
+the Dock or the Start menu. On Windows they run with `cmd.exe` (PowerShell 7 is an option in Settings). Turn on
+**interactive** for a step that reads keys, such as `flutter run` (press `r` to hot reload in the Logs view).
+
+### 🖥️ Services
+
+```yaml
+services:
+  - name: API
+    run: php artisan serve --port 8000
+    ready: { port: 8000, timeout: 90s }     # or url: http://localhost:8000/health, or log: "Server started" (default wait 60s)
+  - name: Database
+    run: docker compose up -d db
+    stop: docker compose down               # runs when the service stops
+stop_services_after_steps: true             # e.g. for E2E: tear down when the steps finish
+```
+
+- A service counts as ready when its **port** opens, a **URL** answers, or a **log line** appears.
+- If the port is already taken by something else, the run fails right away instead of testing an old server.
+- The card's **Run** button offers **Run all** (services, then steps), **Run without services**, and
+  **Run services only**, which keeps your dev servers up until you press Stop.
+
+### 🗄️ Queries
+
+```yaml
+secret_env: [DATABASE_URL]      # its value is kept in your system keychain, never in the file
+steps:
+  - name: No stuck orders
+    query:
+      connection: DATABASE_URL
+      sql: select id from orders where status = 'pending' and created_at < now() - interval '1 hour'
+      expect: no_rows           # or rows, or leave it out for a report that always passes
+```
+
+Queries run with `psql` (install PostgreSQL's command-line tools) and work with Postgres and Supabase. They are
+**read-only** unless you turn on `allow_writes`, and the result shows up as a table in the log.
+
+### ✨ AI tasks (optional)
+
+```yaml
+steps:
+  - name: Add discount codes
+    prompt: Add support for the SAVE10 discount code in the cart total, with a unit test.
+  - name: Tests
+    run: npm test             # check the AI's work with a normal command
+```
+
+AI tasks need **Agent mode** (Settings → AI) and your own Claude or OpenAI API key. The AI can read and change files
+only inside the agent's folder, never `.env` files, keys, `.git` or `node_modules`. The earlier version of every
+file it changes is kept on your computer for 90 days.
+
+### A complete agent
+
+Put together, one agent can start your app, check it, check the database and hand a task to the AI:
+
+```yaml
+name: Acme Shop
+title: Staging smoke
+project: acme-shop
+path: ~/code/acme-shop
+tags: [web, staging]
+secret_env: [DATABASE_URL]
+services:
+  - name: Storefront
+    run: npm run dev
+    ready: { port: 5173 }
+stop_services_after_steps: true
+steps:
+  - name: Smoke tests
+    run: npx playwright test smoke
+  - name: No stuck orders
+    query:
+      connection: DATABASE_URL
+      sql: select id from orders where status = 'pending' and created_at < now() - interval '1 hour'
+      expect: no_rows
+on_success:
+  message: Staging looks good
+```
+
+## When something fails
+
+The card turns red and says exactly where: **Failed at step 3: Unit tests exited with code 1**. One click opens the
+log of that step. With an AI key you can also get:
+
+- **AI analysis** of the failure: the cause, where it is (opens your editor at the line) and how to fix it.
+- **Fix with AI** (Agent mode): the AI makes the fix, backs up the files, runs the agent again, and you can
+  **Show changes** or **Undo**.
+
+## Two modes
+
+| | **AI off** (default, no key) | **AI on** (your AI key) |
+|---|---|---|
+| Set up | Nothing | Settings → AI → Claude or OpenAI → paste key → Test key |
+| Commands, services, queries, logs, Pause/Stop, history, notifications | ✅ | ✅ |
+| AI tasks and Fix with AI | — | ✅ with Agent mode on |
+| When a step fails | "Failed at step N" + the log | The same, plus a short AI analysis: cause, where, fix |
+| Network use by the app | None (only the optional update check) | Provider calls for failed runs and AI tasks only |
+| Cost | Free | Free app; you pay your provider for your own API usage |
+
+Works with Claude (Anthropic) and OpenAI models. agent-qordrift is not affiliated with or endorsed by either.
 
 ## Download
 
@@ -36,8 +187,9 @@ confirm the first time you open it.
    xattr -dr com.apple.quarantine /Applications/agent-qordrift.app
    ```
 
-**Keychain prompt (only with an AI key):** your API key is kept in the macOS Keychain. Until agent-qordrift has an Apple
-Developer ID, macOS may ask "agent-qordrift wants to use your keychain" after each update. Choose **Always Allow**.
+**Keychain prompt (only with an AI key or secrets):** keys and secret variables are kept in the macOS Keychain.
+Until agent-qordrift has an Apple Developer ID, macOS may ask "agent-qordrift wants to use your keychain" after each
+update. Choose **Always Allow**.
 
 ### Windows
 
@@ -48,62 +200,18 @@ Developer ID, macOS may ask "agent-qordrift wants to use your keychain" after ea
 ## Quick start
 
 1. Click **Add your first agent** (or **Import example**).
-2. Pick a project (it groups agents, e.g. "Shop" with a "Local" and a "Staging" agent), the agent's folder, and
-   add steps, one command each:
+2. Pick a project (or type a new one), the agent's folder, and a name such as *Local checks*.
+3. Add steps and services, then click **Save** and **Run**.
 
-   ```yaml
-   name: My app
-   path: ~/code/my-app
-   steps:
-     - name: Lint
-       run: npm run lint
-     - name: Unit tests
-       run: npm test
-     - name: E2E
-       dir: web
-       run: npm run e2e
-       timeout: 20m
-   ```
-
-3. Click **Run**. Steps run in order and stop at the first failure.
-
-Steps run with your normal shell environment (nvm, pyenv, Homebrew, Go…), even when agent-qordrift is opened from the
-Dock or the Start menu. On Windows, steps run with `cmd.exe` (PowerShell 7 is an option in Settings).
-
-## Two modes
-
-| | **AI off** (default, no key) | **AI on** (your AI key) |
-|---|---|---|
-| Set up | Nothing | Settings → AI → Claude or OpenAI → paste key → Test key |
-| Steps, logs, Pause/Stop, history, notifications | ✅ | ✅ |
-| When a step fails | "Failed at step N" + the log | The same, plus a short AI analysis: cause, where, fix |
-| Network use by the app | None (only the optional update check) | Provider calls for failed runs only |
-| Cost | Free | Free app; you pay your provider for your own API usage |
-
-Works with Claude (Anthropic) and OpenAI models. agent-qordrift is not affiliated with or endorsed by either.
-
-## Features
-
-- **Projects and Home:** group agents by project, with a logo; Home shows one tile per project with how its last
-  runs went. Bookmarks keep each project's links (staging site, dashboard, docs) one click away.
-- **Agents as cards:** folder, ordered steps, per-step folder and timeout, environment variables and secrets (kept
-  in the system keychain), tags, success message.
-- **Database checks:** run a SQL query against Postgres or Supabase (with `psql`) and report the result, or expect rows or no rows.
-- **Schedules:** run an agent once at a set time, every few minutes, hours or days, or on chosen weekdays.
-- **Services:** start a dev server before the steps, wait until a port, URL or log line is ready, stop it after.
-  A port that is already in use fails the run instead of testing an old server.
-- **Pause, Resume, Stop:** pause after the current step (or immediately on macOS); Stop ends the whole process tree.
-- **Run all:** one after another (default) or in parallel.
-- **Live logs with colors**, search, copy, and per-step tabs; history of the last 50 runs with git branch and commit.
-- **Notifications and tray icon** with the overall status.
-- **Agent editor** with a YAML mode and validation; import/export agents as `.yaml` files (imported agents show
-  their commands and ask before the first run).
+Agents can be exported and imported as `.yaml` files. An imported agent shows its commands and asks before its
+first run.
 
 ## Privacy
 
 No accounts, no telemetry, no analytics. Your agents, logs and history stay on your computer. With AI on, only a
-masked excerpt of a failed step's log is sent, to the provider you chose, with your key. API keys are kept only in
-your system keychain. Read the full [privacy statement](PRIVACY.md).
+masked excerpt of a failed step's log is sent, to the provider you chose, with your key; AI tasks and Fix with AI
+also send the files the AI reads, masked the same way. API keys and secret variables are kept only in your system
+keychain. Read the full [privacy statement](PRIVACY.md).
 
 ## Updates
 
