@@ -2,6 +2,13 @@
 
 All notable changes to agent-qordrift. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] — 2026-11-15
+
+- **Home button** before the search box: one click clears the search and filters and goes back to Home.
+- **License:** the Windows installers show the license and ask you to accept it; the first launch says that
+  continuing means agreeing to the license and the privacy statement; **About** links to the license.
+- **About** shows the author and copyright: © 2026 Jayvee S. (jsxd3v).
+
 ## [1.0.0] — 2026-11-14
 
 First public release.
